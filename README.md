@@ -20,6 +20,44 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Admin transfers console
+
+A protected admin page at `/admin` lets you move funds from your Stripe **platform
+balance** to your **connected accounts** (Stripe Connect transfers).
+
+### Setup
+
+1. Copy the env template and fill it in:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+   - `STRIPE_SECRET_KEY` — your platform secret key (`sk_test_...` to start safely).
+   - `AUTH_SECRET` — generate one:
+     `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD` — the single admin login.
+
+2. Run `npm run dev`, go to `/admin`, and sign in.
+
+### How it works
+
+- `proxy.ts` gates `/admin/**` behind a NextAuth session (redirects to `/login`).
+- `/admin` lists your connected accounts and platform balance, then lets you create
+  a transfer after a confirmation step.
+- API routes (`/api/admin/*`) re-check the session server-side and call Stripe:
+  `accounts.list`, `balance.retrieve`, and `transfers.create`.
+
+### Notes / safeguards
+
+- A transfer requires the destination account to have the **transfers** capability
+  active; the dropdown flags accounts that don't.
+- Amounts are entered in major units (dollars) and converted to the smallest unit
+  server-side; only 2 decimal places are allowed.
+- Each transfer sends an idempotency key to prevent accidental double-sends.
+- Use a **test-mode** key (`sk_test_...`) until you've verified the flow — the page
+  shows a `TEST MODE` badge so you always know which mode you're in.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
