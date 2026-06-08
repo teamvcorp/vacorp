@@ -4,7 +4,9 @@ import SiteFooter from "@/app/components/SiteFooter";
 import { stripe } from "@/lib/stripe";
 
 export const metadata = {
-  title: "Thank you · VA Corp",
+  title: "Thank you",
+  // Transactional confirmation page — keep out of search indexes.
+  robots: { index: false, follow: false },
 };
 
 function formatMoney(minor: number, currency: string) {

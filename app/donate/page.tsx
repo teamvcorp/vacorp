@@ -3,9 +3,17 @@ import SiteFooter from "@/app/components/SiteFooter";
 import DonateForm from "./DonateForm";
 
 export const metadata = {
-  title: "Donate · VA Corp",
+  title: "Donate",
   description:
     "Fund equality and sustainability in housing, education, and healthcare. Your gift powers living-systems initiatives that regenerate communities.",
+  alternates: { canonical: "/donate" },
+  openGraph: {
+    title: "Donate · VA Corp",
+    description:
+      "Your gift powers living-systems initiatives across housing, education, and healthcare.",
+    url: "/donate",
+    type: "website",
+  },
 };
 
 const stats = [
@@ -50,7 +58,7 @@ export default function DonatePage() {
                 {stats.map((s) => (
                   <div
                     key={s.label}
-                    className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-center"
+                    className="rounded-2xl border border-white/10 bg-white/2 p-4 text-center"
                   >
                     <dt className="text-2xl font-bold text-white">{s.value}</dt>
                     <dd className="mt-1 text-xs text-slate-400">{s.label}</dd>
@@ -99,7 +107,7 @@ export default function DonatePage() {
             </div>
           </div>
 
-          <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-center">
+          <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-white/10 bg-white/2 p-6 text-center">
             <p className="text-slate-300">
               &ldquo;The best time to plant a tree was twenty years ago. The
               second best time is now.&rdquo;

@@ -3,6 +3,7 @@ import TransferConsole from "./TransferConsole";
 
 export const metadata = {
   title: "Admin · Transfers",
+  robots: { index: false, follow: false },
 };
 
 export default async function AdminPage() {

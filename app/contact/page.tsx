@@ -3,9 +3,17 @@ import SiteFooter from "@/app/components/SiteFooter";
 import ContactForm from "./ContactForm";
 
 export const metadata = {
-  title: "Contact · VA Corp",
+  title: "Contact",
   description:
     "Partner, volunteer, or just say hello. Reach the VA Corp team and join the movement for equality and sustainability.",
+  alternates: { canonical: "/contact" },
+  openGraph: {
+    title: "Contact · VA Corp",
+    description:
+      "Partner, volunteer, or just say hello. Join the movement for equality and sustainability.",
+    url: "/contact",
+    type: "website",
+  },
 };
 
 export default function ContactPage() {
