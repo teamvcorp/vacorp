@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import SiteHeader from "@/app/components/SiteHeader";
+import SiteFooter from "@/app/components/SiteFooter";
 
 const initiatives = [
   {
@@ -43,41 +45,7 @@ const principles = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-slate-950/80 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="#top" className="flex items-center gap-3">
-            <Image
-              src="/images/vaLogoRevamp.png"
-              alt="VA Corp"
-              width={40}
-              height={40}
-              priority
-            />
-            <span className="text-lg font-bold tracking-tight">VA CORP</span>
-          </Link>
-          <div className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
-            <a href="#mission" className="transition hover:text-white">
-              Mission
-            </a>
-            <a href="#initiatives" className="transition hover:text-white">
-              Initiatives
-            </a>
-            <a href="#approach" className="transition hover:text-white">
-              Our Approach
-            </a>
-            <a href="#involved" className="transition hover:text-white">
-              Get Involved
-            </a>
-          </div>
-          <a
-            href="#involved"
-            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
-          >
-            Get Involved
-          </a>
-        </nav>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section
@@ -117,12 +85,12 @@ export default function Home() {
             they serve.
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="#involved"
-              className="rounded-full bg-blue-600 px-7 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+            <Link
+              href="/donate"
+              className="rounded-full bg-emerald-600 px-7 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500"
             >
-              Join the movement
-            </a>
+              Donate
+            </Link>
             <a
               href="#initiatives"
               className="rounded-full border border-white/15 bg-white/5 px-7 py-3 text-base font-semibold text-white transition hover:bg-white/10"
@@ -248,63 +216,24 @@ export default function Home() {
               is a place for you in this movement.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a
-                href="mailto:teamvcorp@thevacorp.com"
-                className="rounded-full bg-white px-7 py-3 text-base font-semibold text-slate-900 transition hover:bg-slate-100"
+              <Link
+                href="/donate"
+                className="rounded-full bg-emerald-600 px-7 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500"
               >
-                Partner with us
-              </a>
-              <a
-                href="mailto:teamvcorp@thevacorp.com"
+                Donate
+              </Link>
+              <Link
+                href="/contact"
                 className="rounded-full border border-white/20 bg-white/5 px-7 py-3 text-base font-semibold text-white transition hover:bg-white/10"
               >
-                Volunteer
-              </a>
+                Partner or volunteer
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 bg-slate-950">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 py-10 md:flex-row">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/images/vaLogoRevamp.png"
-              alt="VA Corp"
-              width={32}
-              height={32}
-            />
-            <div className="text-sm text-slate-400">
-              <span className="font-semibold text-slate-200">VA Corp</span> ·
-              Equality &amp; sustainability for all.
-            </div>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-slate-400">
-            <a href="#mission" className="transition hover:text-white">
-              Mission
-            </a>
-            <a href="#initiatives" className="transition hover:text-white">
-              Initiatives
-            </a>
-            <a
-              href="mailto:teamvcorp@thevacorp.com"
-              className="transition hover:text-white"
-            >
-              Contact
-            </a>
-            <Link
-              href="/admin"
-              className="rounded-full border border-white/10 px-3 py-1 text-slate-500 transition hover:border-white/20 hover:text-slate-300"
-            >
-              Admin
-            </Link>
-          </div>
-        </div>
-        <div className="border-t border-white/5 py-5 text-center text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} VA Corp. All rights reserved.
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
