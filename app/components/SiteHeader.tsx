@@ -22,6 +22,9 @@ export default function SiteHeader() {
           <Link href="/#initiatives" className="transition hover:text-white">
             Initiatives
           </Link>
+          <Link href="/#leaders" className="transition hover:text-white">
+            Programs
+          </Link>
           <Link href="/#approach" className="transition hover:text-white">
             Our Approach
           </Link>

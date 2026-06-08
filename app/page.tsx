@@ -10,6 +10,8 @@ const initiatives = [
     body: "Designing and supporting living spaces that are affordable, resilient, and built to regenerate the communities around them — not just shelter people, but help them thrive.",
     accent: "from-emerald-500/20 to-emerald-500/0",
     dot: "bg-emerald-400",
+    href: "https://edynsgate.com",
+    program: "Edynsgate",
   },
   {
     tag: "Education",
@@ -17,6 +19,8 @@ const initiatives = [
     body: "Real-world, future-ready education that adapts to each learner. We treat knowledge like an ecosystem — collaborative, hands-on, and rooted in equity for every student.",
     accent: "from-blue-500/20 to-blue-500/0",
     dot: "bg-blue-400",
+    href: "https://homeschool-plus.com",
+    program: "Homeschool+",
   },
   {
     tag: "Healthcare",
@@ -24,6 +28,29 @@ const initiatives = [
     body: "Whole-person health initiatives that close gaps in access. We build sustainable models of care that meet people where they are and grow with the communities they serve.",
     accent: "from-violet-500/20 to-violet-500/0",
     dot: "bg-violet-400",
+    href: "https://rallyup.us",
+    program: "RallyUp",
+  },
+];
+
+const youthPrograms = [
+  {
+    tag: "Youth Leadership",
+    title: "Build a Living Résumé",
+    body: "Starting young, students document real skills, service projects, and community endorsements in a résumé that grows with every good action — turning everyday character into lifelong opportunity.",
+    accent: "from-amber-500/20 to-amber-500/0",
+    dot: "bg-amber-400",
+    href: "https://thegooddeed.net",
+    program: "The Good Deed",
+  },
+  {
+    tag: "Positive Behavior",
+    title: "Kindness, Rewarded",
+    body: "Kids earn points for good deeds and positive behavior, redeemable for real holiday gifts from Santa — encouraging generosity over consumption while easing the financial burden on parents.",
+    accent: "from-rose-500/20 to-rose-500/0",
+    dot: "bg-rose-400",
+    href: "https://spiritofsanta.com",
+    program: "Spirit of Santa",
   },
 ];
 
@@ -137,9 +164,12 @@ export default function Home() {
           </div>
           <div className="grid gap-6 md:grid-cols-3">
             {initiatives.map((it) => (
-              <div
+              <a
                 key={it.tag}
-                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b ${it.accent} p-8 transition hover:-translate-y-1 hover:border-white/20`}
+                href={it.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b ${it.accent} p-8 transition hover:-translate-y-1 hover:border-white/20`}
               >
                 <div className="mb-5 flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${it.dot}`} />
@@ -153,9 +183,60 @@ export default function Home() {
                 <p className="text-sm leading-relaxed text-slate-400">
                   {it.body}
                 </p>
-              </div>
+                <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+                  Visit {it.program}
+                  <span className="transition-transform group-hover:translate-x-1">
+                    →
+                  </span>
+                </span>
+              </a>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Youth leadership programs */}
+      <section id="leaders" className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mb-14 text-center">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-amber-400">
+            Future Leaders
+          </p>
+          <h2 className="text-3xl font-bold text-white md:text-4xl">
+            Building leaders from an early age
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-slate-400">
+            Lasting change needs people to carry it forward. Through innovative,
+            hands-on programs, we help young people grow into leaders — rewarding
+            character, service, and community engagement long before adulthood.
+          </p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {youthPrograms.map((it) => (
+            <a
+              key={it.tag}
+              href={it.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b ${it.accent} p-8 transition hover:-translate-y-1 hover:border-white/20`}
+            >
+              <div className="mb-5 flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${it.dot}`} />
+                <span className="text-xs font-semibold uppercase tracking-widest text-slate-300">
+                  {it.tag}
+                </span>
+              </div>
+              <h3 className="mb-3 text-xl font-bold text-white">{it.title}</h3>
+              <p className="text-sm leading-relaxed text-slate-400">
+                {it.body}
+              </p>
+              <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+                Visit {it.program}
+                <span className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
+              </span>
+            </a>
+          ))}
         </div>
       </section>
 
