@@ -1,8 +1,8 @@
 import { auth, signOut } from "@/auth";
-import TransferConsole from "./TransferConsole";
+import AdminTabs from "./AdminTabs";
 
 export const metadata = {
-  title: "Admin · Transfers",
+  title: "Admin",
   robots: { index: false, follow: false },
 };
 
@@ -12,7 +12,7 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/60">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div>
             <h1 className="text-lg font-bold">VA Corp · Admin</h1>
             <p className="text-xs text-slate-400">
@@ -35,8 +35,8 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <TransferConsole />
+      <main className="mx-auto max-w-4xl px-6 py-8">
+        <AdminTabs />
       </main>
     </div>
   );
