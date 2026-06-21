@@ -8,6 +8,12 @@ type Flags = {
   hasInstantDestination: boolean;
   instantVia: "card" | "bank" | null;
   instantEligible: boolean;
+  balance: {
+    available: number;
+    instantAvailable: number;
+    pending: number;
+  };
+  destination: { type: "card" | "bank"; label: string } | null;
 };
 
 type PayoutResult = {
@@ -183,6 +189,44 @@ export default function InstantPayoutPanel({
         )}
       </div>
 
+      {/* Connected-account balance — the source of an instant payout */}
+      {flags && (
+        <div className="mb-4 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
+          <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+            {label || "Connected account"} balance
+            <span className="ml-1 font-mono text-slate-600">
+              ({accountId.slice(0, 12)}…)
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
+            <span className="text-emerald-300">
+              Instant-available{" "}
+              <span className="font-semibold">
+                {formatMoney(flags.balance.instantAvailable, "usd")}
+              </span>
+            </span>
+            <span className="text-slate-300">
+              Available{" "}
+              <span className="font-semibold">
+                {formatMoney(flags.balance.available, "usd")}
+              </span>
+            </span>
+            <span className="text-slate-500">
+              Pending {formatMoney(flags.balance.pending, "usd")}
+            </span>
+          </div>
+          {flags.balance.instantAvailable === 0 &&
+            flags.balance.available > 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                Instant payouts can only use the{" "}
+                <span className="text-emerald-400">instant-available</span>{" "}
+                balance. Funds transferred in sit in the standard available
+                balance and aren&apos;t instantly payable.
+              </p>
+            )}
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {error}
@@ -230,10 +274,43 @@ export default function InstantPayoutPanel({
       {/* Eligible → payout form */}
       {flags?.instantEligible && (
         <div className="space-y-4">
+          {/* From → To clarity */}
+          <div className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm sm:grid-cols-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                From
+              </p>
+              <p className="text-slate-200">{label || "Connected account"}</p>
+              <p className="font-mono text-xs text-slate-500">{accountId}</p>
+              <p className="mt-1 text-xs text-emerald-300">
+                Instant-available{" "}
+                {formatMoney(flags.balance.instantAvailable, "usd")}
+              </p>
+            </div>
+            <div className="sm:border-l sm:border-slate-800 sm:pl-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                To
+              </p>
+              <p className="text-slate-200">
+                {flags.destination?.label ??
+                  (flags.instantVia === "bank"
+                    ? "Bank account"
+                    : "Debit card")}
+              </p>
+              <p className="text-xs text-slate-500">
+                Instant payout · arrives in ~30 min
+              </p>
+            </div>
+          </div>
+
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-slate-400">
-                Amount (to debit card)
+                Amount{" "}
+                <span className="text-slate-500">
+                  (instant-available{" "}
+                  {formatMoney(flags.balance.instantAvailable, "usd")})
+                </span>
               </label>
               <input
                 type="number"
@@ -267,7 +344,18 @@ export default function InstantPayoutPanel({
                 <span className="font-bold">
                   {formatMoney(Math.round(amountNum * 100), "usd")}
                 </span>{" "}
-                instantly to {label || "this account"}&apos;s debit card?
+                instantly from{" "}
+                <span className="font-semibold">
+                  {label || "this account"}
+                </span>{" "}
+                to{" "}
+                <span className="font-semibold">
+                  {flags.destination?.label ??
+                    (flags.instantVia === "bank"
+                      ? "their bank account"
+                      : "their debit card")}
+                </span>
+                ?
               </p>
               <div className="mt-3 flex gap-2">
                 <button

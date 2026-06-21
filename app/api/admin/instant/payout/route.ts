@@ -62,9 +62,13 @@ export async function POST(request: Request) {
 
     if (!instant || instant.amount < amountCents) {
       const have = instant ? (instant.amount / 100).toFixed(2) : "0.00";
+      const standard = (
+        ((balance.available ?? []).find((b) => b.currency === "usd")?.amount ??
+          0) / 100
+      ).toFixed(2);
       return NextResponse.json(
         {
-          error: `Insufficient instant-available balance (have $${have}). Transfer funds to this account first.`,
+          error: `This connected account's instant-available balance is $${have} (standard available: $${standard}). Instant payouts can only use the instant-available balance — funds transferred in are not instantly payable.`,
         },
         { status: 400 }
       );
