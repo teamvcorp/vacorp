@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import InstantPayoutPanel from "./InstantPayoutPanel";
 
 type Account = {
   id: string;
@@ -272,6 +273,15 @@ export default function TransferConsole() {
           </div>
         )}
       </section>
+
+      {/* Instant payout — tied to the same selected destination account */}
+      {selectedAccount && (
+        <InstantPayoutPanel
+          accountId={selectedAccount.id}
+          email={selectedAccount.email ?? ""}
+          label={selectedAccount.label}
+        />
+      )}
 
       {/* Confirmation modal */}
       {confirming && (
