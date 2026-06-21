@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 type Flags = {
   payoutsEnabled: boolean;
   hasDebitCard: boolean;
+  hasInstantDestination: boolean;
+  instantVia: "card" | "bank" | null;
   instantEligible: boolean;
 };
 
@@ -162,10 +164,15 @@ export default function InstantPayoutPanel({
         ) : flags?.instantEligible ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-medium text-emerald-300">
             ✅ Eligible for instant payout
+            {flags.instantVia === "bank"
+              ? " (via bank account)"
+              : flags.instantVia === "card"
+                ? " (via debit card)"
+                : ""}
           </span>
         ) : (
           <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-300">
-            ⚠️ Debit card not added yet
+            ⚠️ No instant payout method yet
           </span>
         )}
         {flags && !flags.payoutsEnabled && (
@@ -192,14 +199,15 @@ export default function InstantPayoutPanel({
         <div className="space-y-3">
           <p className="text-sm text-slate-400">
             Send {label || "the account owner"}
-            {email ? ` (${email})` : ""} a secure link to add their debit card.
+            {email ? ` (${email})` : ""} a secure link to add a debit card or
+            instant-eligible bank account.
           </p>
           <button
             onClick={sendDebitLink}
             disabled={sendingLink}
             className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
           >
-            {sendingLink ? "Sending…" : "Send debit-card setup link"}
+            {sendingLink ? "Sending…" : "Send payout setup link"}
           </button>
           {linkUrl && (
             <div className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">

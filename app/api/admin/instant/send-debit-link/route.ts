@@ -42,23 +42,43 @@ export async function POST(request: Request) {
     // collects just the outstanding requirements (e.g. the debit card) without
     // restarting or discarding anything the owner already entered.
     const onboarded = account.details_submitted === true;
-    const mode = onboarded ? "update" : "onboarding";
 
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      type: onboarded ? "account_update" : "account_onboarding",
-      collection_options: { fields: "currently_due" },
-      refresh_url: `${SITE_URL}/payout-setup?reauth=true`,
-      return_url: `${SITE_URL}/payout-setup?success=true`,
-    });
+    // Prefer the type that matches onboarding state, but Stripe can still reject
+    // it depending on the account's controller config — so fall back to the other
+    // type on the specific "valid types" error. currently_due = resume, not restart.
+    async function createLink(type: "account_update" | "account_onboarding") {
+      return stripe.accountLinks.create({
+        account: accountId,
+        type,
+        collection_options: { fields: "currently_due" },
+        refresh_url: `${SITE_URL}/payout-setup?reauth=true`,
+        return_url: `${SITE_URL}/payout-setup?success=true`,
+      });
+    }
+
+    const preferred = onboarded ? "account_update" : "account_onboarding";
+    const fallback = onboarded ? "account_onboarding" : "account_update";
+
+    let accountLink: Awaited<ReturnType<typeof createLink>>;
+    let usedType: "account_update" | "account_onboarding";
+    try {
+      accountLink = await createLink(preferred);
+      usedType = preferred;
+    } catch {
+      accountLink = await createLink(fallback);
+      usedType = fallback;
+    }
+
+    const mode = usedType === "account_update" ? "update" : "onboarding";
 
     // Figure out who to email: explicit override, else the account's email.
     const to = overrideEmail || account.email || "";
 
-    const action = onboarded
-      ? "add your debit card"
-      : "finish setting up payouts (including your debit card)";
-    const cta = onboarded ? "Add my debit card" : "Finish payout setup";
+    const action =
+      mode === "update"
+        ? "add your debit card or bank account"
+        : "finish setting up payouts (add a debit card or bank account)";
+    const cta = mode === "update" ? "Add payout method" : "Finish payout setup";
 
     let emailed = false;
     if (to && process.env.RESEND_API_KEY) {

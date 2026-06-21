@@ -4,6 +4,8 @@ import { stripe } from "./stripe";
 export type AccountFlags = {
   payoutsEnabled: boolean;
   hasDebitCard: boolean;
+  hasInstantDestination: boolean;
+  instantVia: "card" | "bank" | null;
   instantEligible: boolean;
 };
 
@@ -39,6 +41,8 @@ export async function getAccountFlags(
   return {
     payoutsEnabled: doc.payoutsEnabled,
     hasDebitCard: doc.hasDebitCard,
+    hasInstantDestination: doc.hasInstantDestination,
+    instantVia: doc.instantVia,
     instantEligible: doc.instantEligible,
   };
 }
@@ -58,18 +62,40 @@ export async function refreshAccountEligibility(
     payoutsEnabled = account.payouts_enabled ?? false;
   }
 
-  // A card external account on a connected account is always a debit card
-  // (Stripe only allows debit cards as card payout destinations).
-  const cards = await stripe.accounts.listExternalAccounts(accountId, {
-    object: "card",
-    limit: 1,
+  // Instant payouts can go to an instant-eligible debit card OR bank account, so
+  // list all external accounts and inspect available_payout_methods (present on
+  // both Card and BankAccount objects).
+  const externals = await stripe.accounts.listExternalAccounts(accountId, {
+    limit: 100,
   });
-  const hasDebitCard = cards.data.length > 0;
+
+  let hasDebitCard = false;
+  let instantCard = false;
+  let instantBank = false;
+  for (const ea of externals.data) {
+    const methods = ea.available_payout_methods ?? [];
+    const isInstant = methods.includes("instant");
+    if (ea.object === "card") {
+      hasDebitCard = true;
+      if (isInstant) instantCard = true;
+    } else if (ea.object === "bank_account" && isInstant) {
+      instantBank = true;
+    }
+  }
+
+  const hasInstantDestination = instantCard || instantBank;
+  const instantVia: AccountFlags["instantVia"] = instantCard
+    ? "card"
+    : instantBank
+      ? "bank"
+      : null;
 
   const flags: AccountFlags = {
     payoutsEnabled,
     hasDebitCard,
-    instantEligible: payoutsEnabled && hasDebitCard,
+    hasInstantDestination,
+    instantVia,
+    instantEligible: payoutsEnabled && hasInstantDestination,
   };
 
   await setAccountFlags(accountId, flags);
