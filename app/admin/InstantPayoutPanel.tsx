@@ -93,10 +93,14 @@ export default function InstantPayoutPanel({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to create link.");
       setLinkUrl(json.url);
+      const kind =
+        json.mode === "onboarding"
+          ? "Onboarding link (owner needs to finish payout setup)"
+          : "Debit-card link";
       setNotice(
         json.emailed
-          ? `Setup link emailed to ${json.to}.`
-          : "Link created — email not sent (no address or RESEND_API_KEY). Copy it below."
+          ? `${kind} emailed to ${json.to}.`
+          : `${kind} created — email not sent (no address or RESEND_API_KEY). Copy it below.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create link.");
