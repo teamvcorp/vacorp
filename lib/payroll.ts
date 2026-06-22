@@ -67,6 +67,9 @@ type EmployeeDoc = {
   payFrequency: PayFrequency;
   filingStatus: FilingStatus;
   startDate: string; // YYYY-MM-DD — hire/effective date (backdateable)
+  ssnLast4: string; // last 4 digits of SSN only (we never store the full SSN)
+  dob: string; // YYYY-MM-DD — date of birth
+  address: string; // mailing address (free text, may be multi-line)
   active: boolean;
   createdAt: Date;
 };
@@ -80,6 +83,9 @@ export type Employee = {
   payFrequency: PayFrequency;
   filingStatus: FilingStatus;
   startDate: string;
+  ssnLast4: string;
+  dob: string;
+  address: string;
   active: boolean;
   createdAt: string;
 };
@@ -151,6 +157,9 @@ function serializeEmployee(doc: EmployeeDoc): Employee {
     payFrequency: doc.payFrequency,
     filingStatus: doc.filingStatus,
     startDate: doc.startDate ?? "",
+    ssnLast4: doc.ssnLast4 ?? "",
+    dob: doc.dob ?? "",
+    address: doc.address ?? "",
     active: doc.active,
     createdAt: iso(doc.createdAt),
   };
@@ -277,7 +286,7 @@ export async function getEmployee(id: string): Promise<Employee | null> {
   return doc ? serializeEmployee(doc) : null;
 }
 
-export async function addEmployee(input: {
+export type EmployeeInput = {
   name: string;
   email: string | null;
   payType: PayType;
@@ -285,11 +294,35 @@ export async function addEmployee(input: {
   payFrequency: PayFrequency;
   filingStatus: FilingStatus;
   startDate: string;
-}): Promise<Employee> {
+  ssnLast4: string;
+  dob: string;
+  address: string;
+};
+
+export async function addEmployee(input: EmployeeInput): Promise<Employee> {
   const col = await employeesCol();
   const doc: EmployeeDoc = { ...input, active: true, createdAt: new Date() };
   const res = await col.insertOne(doc);
   return serializeEmployee({ ...doc, _id: res.insertedId });
+}
+
+export async function updateEmployee(
+  id: string,
+  input: EmployeeInput
+): Promise<Employee | null> {
+  let _id: ObjectId;
+  try {
+    _id = new ObjectId(id);
+  } catch {
+    return null;
+  }
+  const col = await employeesCol();
+  const res = await col.findOneAndUpdate(
+    { _id },
+    { $set: input },
+    { returnDocument: "after" }
+  );
+  return res ? serializeEmployee(res) : null;
 }
 
 export async function deleteEmployee(id: string): Promise<boolean> {

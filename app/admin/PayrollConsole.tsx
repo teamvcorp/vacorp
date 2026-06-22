@@ -16,6 +16,9 @@ type Employee = {
   payFrequency: PayFrequency;
   filingStatus: FilingStatus;
   startDate: string;
+  ssnLast4: string;
+  dob: string;
+  address: string;
   active: boolean;
 };
 
@@ -83,7 +86,8 @@ export default function PayrollConsole() {
   const [reportYear, setReportYear] = useState(thisYear());
   const [reportQuarter, setReportQuarter] = useState(thisQuarter());
 
-  // Add-employee form (most staff are salaried + monthly)
+  // Add/edit-employee form (most staff are salaried + monthly)
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [payType, setPayType] = useState<PayType>("salary");
@@ -91,7 +95,39 @@ export default function PayrollConsole() {
   const [payFrequency, setPayFrequency] = useState<PayFrequency>("monthly");
   const [filingStatus, setFilingStatus] = useState<FilingStatus>("single");
   const [startDate, setStartDate] = useState(todayISO());
+  const [ssnLast4, setSsnLast4] = useState("");
+  const [dob, setDob] = useState("");
+  const [address, setAddress] = useState("");
   const [savingEmp, setSavingEmp] = useState(false);
+
+  function resetEmployeeForm() {
+    setEditingId(null);
+    setName("");
+    setEmail("");
+    setPayType("salary");
+    setRate("");
+    setPayFrequency("monthly");
+    setFilingStatus("single");
+    setStartDate(todayISO());
+    setSsnLast4("");
+    setDob("");
+    setAddress("");
+  }
+
+  function startEdit(emp: Employee) {
+    setEditingId(emp.id);
+    setName(emp.name);
+    setEmail(emp.email ?? "");
+    setPayType(emp.payType);
+    setRate((emp.rateCents / 100).toString());
+    setPayFrequency(emp.payFrequency);
+    setFilingStatus(emp.filingStatus);
+    setStartDate(emp.startDate || todayISO());
+    setSsnLast4(emp.ssnLast4 ?? "");
+    setDob(emp.dob ?? "");
+    setAddress(emp.address ?? "");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   // Run-paycheck form
   const [runEmployeeId, setRunEmployeeId] = useState("");
@@ -169,30 +205,34 @@ export default function PayrollConsole() {
     loadPaychecks();
   }, [loadPaychecks]);
 
-  async function addEmployee(e: React.FormEvent) {
+  async function saveEmployee(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setMsg(null);
     setSavingEmp(true);
+    const payload = {
+      name,
+      email,
+      payType,
+      rate,
+      payFrequency,
+      filingStatus,
+      startDate,
+      ssnLast4,
+      dob,
+      address,
+      ...(editingId ? { id: editingId } : {}),
+    };
     try {
       const res = await fetch("/api/admin/payroll/employees", {
-        method: "POST",
+        method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          payType,
-          rate,
-          payFrequency,
-          filingStatus,
-          startDate,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save employee.");
-      setName("");
-      setEmail("");
-      setRate("");
+      setMsg(editingId ? "Employee updated." : "Employee added.");
+      resetEmployeeForm();
       loadEmployees();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save employee.");
@@ -365,12 +405,12 @@ export default function PayrollConsole() {
         </div>
       )}
 
-      {/* Add employee */}
+      {/* Add / edit employee */}
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
-          Add employee
+          {editingId ? "Edit employee" : "Add employee"}
         </h3>
-        <form onSubmit={addEmployee} className="space-y-4">
+        <form onSubmit={saveEmployee} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Name</label>
@@ -461,27 +501,79 @@ export default function PayrollConsole() {
             </div>
           </div>
 
-          <div className="sm:w-64">
-            <label className={labelCls}>Start date (hire / effective)</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={inputCls}
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Backdate this for existing staff (e.g. 2026-01-01) to enable catch-up
-              back pay.
-            </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className={labelCls}>Start date (hire / effective)</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Date of birth</label>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>SSN (last 4)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={ssnLast4}
+                onChange={(e) =>
+                  setSsnLast4(e.target.value.replace(/\D/g, "").slice(0, 4))
+                }
+                placeholder="1234"
+                className={inputCls}
+              />
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={savingEmp}
-            className="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
-          >
-            {savingEmp ? "Saving…" : "Add employee"}
-          </button>
+          <div>
+            <label className={labelCls}>Address</label>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              rows={2}
+              placeholder="123 Main St, City, IA 50000"
+              className={inputCls}
+            />
+          </div>
+
+          <p className="text-xs text-slate-500">
+            Start date can be backdated for existing staff (e.g. 2026-01-01) to
+            enable catch-up back pay. We store only the last 4 SSN digits.
+          </p>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={savingEmp}
+              className="rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+            >
+              {savingEmp
+                ? "Saving…"
+                : editingId
+                  ? "Update employee"
+                  : "Add employee"}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetEmployeeForm}
+                className="rounded-lg border border-slate-600 px-5 py-2 font-semibold text-slate-300 transition hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
 
         {employees.length > 0 && (
@@ -495,6 +587,8 @@ export default function PayrollConsole() {
                   <th className="py-2 pr-4 font-medium">Frequency</th>
                   <th className="py-2 pr-4 font-medium">Filing</th>
                   <th className="py-2 pr-4 font-medium">Start</th>
+                  <th className="py-2 pr-4 font-medium">SSN</th>
+                  <th className="py-2 pr-4 font-medium">DOB</th>
                   <th className="py-2"></th>
                 </tr>
               </thead>
@@ -518,7 +612,17 @@ export default function PayrollConsole() {
                     <td className="py-2 pr-4 text-slate-400">
                       {emp.startDate || "—"}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 pr-4 text-slate-400">
+                      {emp.ssnLast4 ? `•••-••-${emp.ssnLast4}` : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-slate-400">{emp.dob || "—"}</td>
+                    <td className="py-2 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => startEdit(emp)}
+                        className="mr-3 text-xs text-blue-400 transition hover:text-blue-300"
+                      >
+                        Edit
+                      </button>
                       <button
                         onClick={() => removeEmployee(emp.id)}
                         className="text-xs text-slate-500 transition hover:text-rose-400"

@@ -1,5 +1,6 @@
 import {
   listPaychecks,
+  listEmployees,
   payrollPeriodRange,
   type ReportPeriod,
 } from "@/lib/payroll";
@@ -46,12 +47,19 @@ export default async function PayrollReportPage({
 }) {
   const sp = await searchParams;
   const { start, end, label } = resolveRange(sp);
-  const paychecks = await listPaychecks({ start, end });
+  const [paychecks, employees] = await Promise.all([
+    listPaychecks({ start, end }),
+    listEmployees(),
+  ]);
 
   return (
     <div style={{ background: "#fff", minHeight: "100vh", padding: "32px 16px" }}>
       <PrintOnLoad />
-      <div dangerouslySetInnerHTML={{ __html: monthlyReportHtml(label, paychecks) }} />
+      <div
+        dangerouslySetInnerHTML={{
+          __html: monthlyReportHtml(label, paychecks, employees),
+        }}
+      />
     </div>
   );
 }

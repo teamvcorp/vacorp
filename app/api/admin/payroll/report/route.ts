@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getResend, CONTACT_FROM } from "@/lib/resend";
 import {
   listPaychecks,
+  listEmployees,
   getPaycheck,
   getEmployee,
   payrollPeriodRange,
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
         to: recipients,
         subject: `Paycheck stub — ${paycheck.employeeName} (${paycheck.payDate})`,
         text: `${EMPLOYER_NAME} paycheck stub for ${paycheck.employeeName}\nPay date: ${paycheck.payDate}\nGross: ${money(paycheck.grossCents)}\nNet: ${money(paycheck.netCents)}`,
-        html: stubHtml(paycheck),
+        html: stubHtml(paycheck, employee),
       });
       if (error) {
         return NextResponse.json(
@@ -121,16 +122,16 @@ export async function POST(request: Request) {
       });
     }
 
-    const paychecks = await listPaychecks({
-      start: range.start,
-      end: range.end,
-    });
+    const [paychecks, employees] = await Promise.all([
+      listPaychecks({ start: range.start, end: range.end }),
+      listEmployees(),
+    ]);
     const { error } = await getResend().emails.send({
       from: CONTACT_FROM,
       to: [adminEmail],
       subject: `Payroll report — ${range.label}`,
       text: `${EMPLOYER_NAME} payroll report for ${range.label}: ${paychecks.length} paycheck(s).`,
-      html: monthlyReportHtml(range.label, paychecks),
+      html: monthlyReportHtml(range.label, paychecks, employees),
     });
     if (error) {
       return NextResponse.json(

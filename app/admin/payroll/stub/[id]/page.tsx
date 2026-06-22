@@ -1,4 +1,4 @@
-import { getPaycheck } from "@/lib/payroll";
+import { getPaycheck, getEmployee } from "@/lib/payroll";
 import { stubHtml } from "@/lib/payrollHtml";
 import PrintOnLoad from "../../PrintOnLoad";
 
@@ -14,6 +14,7 @@ export default async function StubPage({
 }) {
   const { id } = await params;
   const paycheck = await getPaycheck(id);
+  const employee = paycheck ? await getEmployee(paycheck.employeeId) : null;
 
   if (!paycheck) {
     return (
@@ -26,7 +27,7 @@ export default async function StubPage({
   return (
     <div style={{ background: "#fff", minHeight: "100vh", padding: "32px 16px" }}>
       <PrintOnLoad />
-      <div dangerouslySetInnerHTML={{ __html: stubHtml(paycheck) }} />
+      <div dangerouslySetInnerHTML={{ __html: stubHtml(paycheck, employee) }} />
     </div>
   );
 }
