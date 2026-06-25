@@ -20,4 +20,5 @@ export const PROGRAMS = [
   { name: "RallyUp", url: "https://rallyup.us", focus: "Healthcare" },
   { name: "The Good Deed", url: "https://thegooddeed.net", focus: "Youth Leadership" },
   { name: "Spirit of Santa", url: "https://spiritofsanta.com", focus: "Positive Behavior" },
+  { name: "Grantify", url: "https://www.getgrantify.com", focus: "Grants & Funding" },
 ];

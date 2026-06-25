@@ -23,8 +23,9 @@ descriptive links across the network raise the whole ecosystem's search authorit
 | RallyUp          | https://rallyup.us           | Healthcare        |
 | The Good Deed    | https://thegooddeed.net      | Youth Leadership  |
 | Spirit of Santa  | https://spiritofsanta.com    | Positive Behavior |
+| Grantify         | https://www.getgrantify.com  | Grants & Funding  |
 
-> When editing one program site, link to **VA Corp** + the **other four** programs
+> When editing one program site, link to **VA Corp** + the **other five** programs
 > (not itself).
 
 ---
@@ -60,6 +61,7 @@ Next.js / React version:
   <a href="https://rallyup.us">RallyUp — Healthcare</a>
   <a href="https://thegooddeed.net">The Good Deed — Youth Leadership</a>
   <a href="https://spiritofsanta.com">Spirit of Santa — Positive Behavior</a>
+  <a href="https://www.getgrantify.com">Grantify — Grants &amp; Funding</a>
 </nav>
 ```
 
