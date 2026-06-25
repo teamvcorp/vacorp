@@ -88,7 +88,8 @@ stay the same everywhere so search engines see one connected network.
     "https://homeschool-plus.com",
     "https://rallyup.us",
     "https://thegooddeed.net",
-    "https://spiritofsanta.com"
+    "https://spiritofsanta.com",
+    "https://www.getgrantify.com"
   ]
 }
 </script>
@@ -113,6 +114,7 @@ const orgJsonLd = {
     "https://rallyup.us",
     "https://thegooddeed.net",
     "https://spiritofsanta.com",
+    "https://www.getgrantify.com",
   ].filter((u) => u !== "https://edynsgate.com"), // drop self
 };
 
@@ -132,7 +134,7 @@ const orgJsonLd = {
 - **Keep links `dofollow`** — do not add `rel="nofollow"` to internal-network links.
 - **Use absolute, canonical URLs** — always `https://www.thevacorp.com` (with `www`),
   not bare or `http://`, so link equity isn't split.
-- **Reciprocate** — the hub already links out to all five programs; each program
+- **Reciprocate** — the hub already links out to all six programs; each program
   should link back to the hub and to its siblings.
 - **One link is enough per target** — a single clear footer/nav link per site beats
   stuffing the same URL many times.
