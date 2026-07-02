@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { stripe } from "@/lib/stripe";
+import { getResend, CONTACT_FROM } from "@/lib/resend";
 import {
   listEntriesInRange,
   addEntry,
@@ -10,6 +12,9 @@ import {
   type Period,
   type LedgerType,
 } from "@/lib/ledger";
+import { paymentReceiptHtml, paymentReceiptText } from "@/lib/ledgerHtml";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function parsePeriod(value: string | null): Period {
   return value === "ytd" ? "ytd" : "month";
@@ -78,6 +83,9 @@ export async function POST(request: Request) {
   const description =
     typeof body.description === "string" ? body.description.trim() : "";
   const date = typeof body.date === "string" ? body.date.trim() : "";
+  const emailReceipt = body.emailReceipt === true;
+  const receiptEmail =
+    typeof body.receiptEmail === "string" ? body.receiptEmail.trim() : "";
   const amountMajor =
     typeof body.amount === "number"
       ? body.amount
@@ -118,19 +126,82 @@ export async function POST(request: Request) {
     );
   }
 
+  let entry;
   try {
-    const entry = await addEntry({
+    entry = await addEntry({
       accountId,
       type,
       amountCents,
       description: description.slice(0, 500),
       date,
     });
-    return NextResponse.json({ entry });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to save entry.";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  // Receipts are payments-only and opt-in. Best-effort: the entry is already
+  // saved, so any email failure is reported but never fails the request.
+  if (type !== "payment" || !emailReceipt) {
+    return NextResponse.json({ entry });
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json({
+      entry,
+      receipt: { sent: false, error: "Email is not configured." },
+    });
+  }
+
+  try {
+    const account = await stripe.accounts.retrieve(accountId);
+    const ownerEmail = account.email ?? null;
+    const ownerName = String(
+      account.business_profile?.name ||
+        account.settings?.dashboard?.display_name ||
+        ownerEmail ||
+        accountId
+    );
+
+    const payerEmail =
+      receiptEmail && EMAIL_RE.test(receiptEmail) ? receiptEmail : null;
+    const recipients = Array.from(
+      new Set(
+        [ownerEmail, payerEmail].filter((e): e is string => !!e)
+      )
+    );
+
+    if (recipients.length === 0) {
+      return NextResponse.json({
+        entry,
+        receipt: {
+          sent: false,
+          error: "No recipient email available for this account.",
+        },
+      });
+    }
+
+    const { error } = await getResend().emails.send({
+      from: CONTACT_FROM,
+      to: recipients,
+      subject: `Payment receipt — ${ownerName}`,
+      text: paymentReceiptText(ownerName, entry),
+      html: paymentReceiptHtml(ownerName, entry, accountId),
+    });
+
+    if (error) {
+      return NextResponse.json({
+        entry,
+        receipt: { sent: false, error: error.message || "Failed to send receipt." },
+      });
+    }
+
+    return NextResponse.json({ entry, receipt: { sent: true, recipients } });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to send receipt.";
+    return NextResponse.json({ entry, receipt: { sent: false, error: message } });
   }
 }
 

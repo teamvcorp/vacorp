@@ -65,6 +65,50 @@ export function ledgerReportHtml(
       </div>`;
 }
 
+/** A single payment receipt as a standalone HTML fragment (email). */
+export function paymentReceiptHtml(
+  ownerName: string,
+  entry: LedgerEntry,
+  accountId: string
+): string {
+  return `
+      <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;color:#0f172a;border:1px solid #e2e8f0;border-radius:12px;padding:24px">
+        <h2 style="margin:0 0 4px">Payment received</h2>
+        <p style="margin:0 0 16px;color:#475569">${escapeHtml(ownerName)}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr>
+            <td style="padding:6px 8px;color:#475569">Date</td>
+            <td style="padding:6px 8px;text-align:right">${escapeHtml(entry.date)}</td>
+          </tr>
+          ${
+            entry.description
+              ? `<tr>
+            <td style="padding:6px 8px;color:#475569">For</td>
+            <td style="padding:6px 8px;text-align:right">${escapeHtml(entry.description)}</td>
+          </tr>`
+              : ""
+          }
+          <tr>
+            <td style="padding:8px;font-weight:700;border-top:2px solid #0f172a">Amount paid</td>
+            <td style="padding:8px;text-align:right;font-weight:700;border-top:2px solid #0f172a;color:#047857">${money(entry.amountCents)}</td>
+          </tr>
+        </table>
+        <p style="margin-top:20px;font-size:14px;color:#334155">Thank you for your payment.</p>
+        <p style="margin-top:16px;font-size:12px;color:#94a3b8">VA Corp admin · ${escapeHtml(accountId)}</p>
+      </div>`;
+}
+
+/** Plain-text version of a payment receipt (email fallback). */
+export function paymentReceiptText(ownerName: string, entry: LedgerEntry): string {
+  return (
+    `Payment received — ${ownerName}\n\n` +
+    `Date: ${entry.date}\n` +
+    (entry.description ? `For: ${entry.description}\n` : "") +
+    `Amount paid: ${money(entry.amountCents)}\n\n` +
+    `Thank you for your payment.`
+  );
+}
+
 /** Plain-text version of the ledger report (email fallback). */
 export function ledgerReportText(
   ownerName: string,

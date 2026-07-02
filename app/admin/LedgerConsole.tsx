@@ -59,6 +59,8 @@ export default function LedgerConsole() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [emailReceipt, setEmailReceipt] = useState(false);
+  const [receiptEmail, setReceiptEmail] = useState("");
   const [adding, setAdding] = useState(false);
 
   // Report
@@ -131,13 +133,30 @@ export default function LedgerConsole() {
       const res = await fetch("/api/admin/ledger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId, type, amount, description, date }),
+        body: JSON.stringify({
+          accountId,
+          type,
+          amount,
+          description,
+          date,
+          emailReceipt: type === "payment" && emailReceipt,
+          receiptEmail,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save entry.");
+      if (json.receipt) {
+        setReportMsg(
+          json.receipt.sent
+            ? `Entry saved · receipt emailed to ${(json.receipt.recipients || []).join(", ")}.`
+            : `Entry saved · receipt not sent: ${json.receipt.error}`
+        );
+      }
       setAmount("");
       setDescription("");
       setDate(todayISO());
+      setEmailReceipt(false);
+      setReceiptEmail("");
       loadLedger();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save entry.");
@@ -339,6 +358,34 @@ export default function LedgerConsole() {
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-blue-500"
                 />
               </div>
+
+              {type === "payment" && (
+                <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={emailReceipt}
+                      onChange={(e) => setEmailReceipt(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                    />
+                    Email a receipt to the account holder
+                  </label>
+                  {emailReceipt && (
+                    <div className="mt-3">
+                      <label className="mb-1 block text-xs text-slate-400">
+                        Payer email (optional) — also send the receipt to whoever paid
+                      </label>
+                      <input
+                        type="email"
+                        value={receiptEmail}
+                        onChange={(e) => setReceiptEmail(e.target.value)}
+                        placeholder="payer@example.com"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-blue-500 sm:max-w-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
           </section>
 
