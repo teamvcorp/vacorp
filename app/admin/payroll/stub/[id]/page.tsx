@@ -1,6 +1,6 @@
 import { getPaycheck, getEmployee } from "@/lib/payroll";
 import { stubHtml } from "@/lib/payrollHtml";
-import PrintOnLoad from "../../PrintOnLoad";
+import PrintOnLoad from "../../../PrintOnLoad";
 
 export const metadata = {
   title: "Paycheck stub",

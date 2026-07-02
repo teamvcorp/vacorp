@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
-  listEntries,
+  listEntriesInRange,
   addEntry,
   deleteEntry,
   computeTotals,
+  periodRange,
+  monthRange,
   type Period,
   type LedgerType,
 } from "@/lib/ledger";
@@ -23,7 +25,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const accountId = searchParams.get("accountId")?.trim() ?? "";
-  const period = parsePeriod(searchParams.get("period"));
+  const month = searchParams.get("month")?.trim() ?? "";
 
   if (!accountId.startsWith("acct_")) {
     return NextResponse.json(
@@ -32,12 +34,23 @@ export async function GET(request: Request) {
     );
   }
 
+  // A specific month takes precedence; otherwise fall back to the period toggle.
+  const period = parsePeriod(searchParams.get("period"));
+  const range = month ? monthRange(month) : periodRange(period);
+  if (!range) {
+    return NextResponse.json(
+      { error: "Please provide a valid month (YYYY-MM)." },
+      { status: 400 }
+    );
+  }
+
   try {
-    const entries = await listEntries(accountId, period);
+    const entries = await listEntriesInRange(accountId, range.start, range.end);
     return NextResponse.json({
       entries,
       totals: computeTotals(entries),
-      period,
+      period: month ? "month" : period,
+      label: range.label,
     });
   } catch (err) {
     const message =

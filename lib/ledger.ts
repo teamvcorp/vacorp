@@ -60,12 +60,40 @@ export function periodRange(period: Period, now = new Date()) {
   return { start: `${y}-${mm}-01`, end: next, label };
 }
 
+/**
+ * Lexicographic [start, end) bounds + label for a specific calendar month
+ * (`YYYY-MM`). Returns null if the string isn't a valid month.
+ */
+export function monthRange(
+  month: string
+): { start: string; end: string; label: string } | null {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const [y, m] = month.split("-").map(Number);
+  if (m < 1 || m > 12) return null;
+  const start = `${y}-${String(m).padStart(2, "0")}-01`;
+  const end =
+    m >= 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const label = new Date(y, m - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  return { start, end, label };
+}
+
 export async function listEntries(
   accountId: string,
   period: Period
 ): Promise<LedgerEntry[]> {
-  const col = await collection();
   const { start, end } = periodRange(period);
+  return listEntriesInRange(accountId, start, end);
+}
+
+export async function listEntriesInRange(
+  accountId: string,
+  start: string,
+  end: string
+): Promise<LedgerEntry[]> {
+  const col = await collection();
   const docs = await col
     .find({ accountId, date: { $gte: start, $lt: end } })
     .sort({ date: -1, createdAt: -1 })

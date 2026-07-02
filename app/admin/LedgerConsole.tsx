@@ -33,10 +33,17 @@ function todayISO() {
   ).padStart(2, "0")}`;
 }
 
+function thisMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function LedgerConsole() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState("");
   const [period, setPeriod] = useState<Period>("month");
+  const [month, setMonth] = useState(thisMonth());
+  const [label, setLabel] = useState("");
 
   const [entries, setEntries] = useState<Entry[]>([]);
   const [totals, setTotals] = useState<Totals>({
@@ -76,30 +83,36 @@ export default function LedgerConsole() {
     })();
   }, []);
 
+  // Query string for the selected range, shared by load, email, and print.
+  const rangeQuery = useMemo(
+    () => (period === "ytd" ? "period=ytd" : `month=${month}`),
+    [period, month]
+  );
+
   const loadLedger = useCallback(async () => {
     if (!accountId) {
       setEntries([]);
       setTotals({ payments: 0, debts: 0, balance: 0 });
+      setLabel("");
       return;
     }
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/admin/ledger?accountId=${encodeURIComponent(
-          accountId
-        )}&period=${period}`
+        `/api/admin/ledger?accountId=${encodeURIComponent(accountId)}&${rangeQuery}`
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load ledger.");
       setEntries(json.entries);
       setTotals(json.totals);
+      setLabel(json.label ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load ledger.");
     } finally {
       setLoading(false);
     }
-  }, [accountId, period]);
+  }, [accountId, rangeQuery]);
 
   useEffect(() => {
     loadLedger();
@@ -158,7 +171,9 @@ export default function LedgerConsole() {
       const res = await fetch("/api/admin/ledger/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId, period }),
+        body: JSON.stringify(
+          period === "ytd" ? { accountId, period: "ytd" } : { accountId, month }
+        ),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to send report.");
@@ -209,7 +224,7 @@ export default function LedgerConsole() {
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                This month
+                Monthly
               </button>
               <button
                 type="button"
@@ -223,6 +238,15 @@ export default function LedgerConsole() {
                 Year to date
               </button>
             </div>
+            {period === "month" && (
+              <input
+                type="month"
+                value={month}
+                max={thisMonth()}
+                onChange={(e) => setMonth(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-blue-500"
+              />
+            )}
           </div>
         </div>
       </section>
@@ -322,7 +346,7 @@ export default function LedgerConsole() {
           <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
             <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                {period === "month" ? "This month" : "Year to date"}
+                {label || (period === "month" ? "This month" : "Year to date")}
               </h3>
               <span className="text-xs text-slate-500">
                 {entries.length} {entries.length === 1 ? "entry" : "entries"}
@@ -431,26 +455,38 @@ export default function LedgerConsole() {
             </div>
           </section>
 
-          {/* Email report */}
+          {/* Report actions */}
           <section className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:flex-row sm:items-center">
             <div className="text-sm text-slate-400">
-              Email the{" "}
+              The{" "}
               <span className="font-medium text-slate-200">
-                {period === "month" ? "this month" : "year-to-date"}
+                {label || (period === "month" ? "this month" : "year-to-date")}
               </span>{" "}
-              report to{" "}
+              report. Email goes to{" "}
               <span className="text-slate-200">
                 {selectedAccount?.email ?? "the account owner"}
               </span>{" "}
               and you.
             </div>
-            <button
-              onClick={sendReport}
-              disabled={reporting}
-              className="shrink-0 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
-            >
-              {reporting ? "Sending…" : "Email report"}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <a
+                href={`/admin/ledger/report?accountId=${encodeURIComponent(
+                  accountId
+                )}&${rangeQuery}`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-slate-700 px-5 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800"
+              >
+                Print report
+              </a>
+              <button
+                onClick={sendReport}
+                disabled={reporting}
+                className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+              >
+                {reporting ? "Sending…" : "Email report"}
+              </button>
+            </div>
           </section>
 
           {reportMsg && (

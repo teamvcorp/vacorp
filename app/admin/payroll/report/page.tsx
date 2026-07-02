@@ -5,7 +5,7 @@ import {
   type ReportPeriod,
 } from "@/lib/payroll";
 import { monthlyReportHtml } from "@/lib/payrollHtml";
-import PrintOnLoad from "../PrintOnLoad";
+import PrintOnLoad from "../../PrintOnLoad";
 
 export const metadata = {
   title: "Payroll report",
