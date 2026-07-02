@@ -12,7 +12,12 @@ import {
   type Period,
   type LedgerType,
 } from "@/lib/ledger";
-import { paymentReceiptHtml, paymentReceiptText } from "@/lib/ledgerHtml";
+import {
+  paymentReceiptHtml,
+  paymentReceiptText,
+  cashDepositReceiptHtml,
+  cashDepositReceiptText,
+} from "@/lib/ledgerHtml";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -84,6 +89,7 @@ export async function POST(request: Request) {
     typeof body.description === "string" ? body.description.trim() : "";
   const date = typeof body.date === "string" ? body.date.trim() : "";
   const emailReceipt = body.emailReceipt === true;
+  const cashDeposit = body.cashDeposit === true;
   const receiptEmail =
     typeof body.receiptEmail === "string" ? body.receiptEmail.trim() : "";
   const amountMajor =
@@ -141,9 +147,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // Receipts are payments-only and opt-in. Best-effort: the entry is already
-  // saved, so any email failure is reported but never fails the request.
-  if (type !== "payment" || !emailReceipt) {
+  // Receipts are opt-in. Payments email the account holder (+ optional payer);
+  // debts marked as a cash deposit email the account holder only. Best-effort:
+  // the entry is already saved, so any email failure is reported but never fails
+  // the request.
+  const sendPaymentReceipt = type === "payment" && emailReceipt;
+  const sendCashDepositReceipt = type === "debt" && cashDeposit;
+  if (!sendPaymentReceipt && !sendCashDepositReceipt) {
     return NextResponse.json({ entry });
   }
 
@@ -164,12 +174,14 @@ export async function POST(request: Request) {
         accountId
     );
 
+    // Payment receipts may also go to the payer; cash-deposit receipts go to the
+    // account owner only.
     const payerEmail =
-      receiptEmail && EMAIL_RE.test(receiptEmail) ? receiptEmail : null;
+      sendPaymentReceipt && receiptEmail && EMAIL_RE.test(receiptEmail)
+        ? receiptEmail
+        : null;
     const recipients = Array.from(
-      new Set(
-        [ownerEmail, payerEmail].filter((e): e is string => !!e)
-      )
+      new Set([ownerEmail, payerEmail].filter((e): e is string => !!e))
     );
 
     if (recipients.length === 0) {
@@ -182,12 +194,22 @@ export async function POST(request: Request) {
       });
     }
 
+    const subject = sendPaymentReceipt
+      ? `Payment receipt — ${ownerName}`
+      : `Cash deposit receipt — ${ownerName}`;
+    const text = sendPaymentReceipt
+      ? paymentReceiptText(ownerName, entry)
+      : cashDepositReceiptText(ownerName, entry);
+    const html = sendPaymentReceipt
+      ? paymentReceiptHtml(ownerName, entry, accountId)
+      : cashDepositReceiptHtml(ownerName, entry, accountId);
+
     const { error } = await getResend().emails.send({
       from: CONTACT_FROM,
       to: recipients,
-      subject: `Payment receipt — ${ownerName}`,
-      text: paymentReceiptText(ownerName, entry),
-      html: paymentReceiptHtml(ownerName, entry, accountId),
+      subject,
+      text,
+      html,
     });
 
     if (error) {

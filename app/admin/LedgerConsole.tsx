@@ -61,6 +61,7 @@ export default function LedgerConsole() {
   const [date, setDate] = useState(todayISO());
   const [emailReceipt, setEmailReceipt] = useState(false);
   const [receiptEmail, setReceiptEmail] = useState("");
+  const [cashDeposit, setCashDeposit] = useState(false);
   const [adding, setAdding] = useState(false);
 
   // Report
@@ -141,6 +142,7 @@ export default function LedgerConsole() {
           date,
           emailReceipt: type === "payment" && emailReceipt,
           receiptEmail,
+          cashDeposit: type === "debt" && cashDeposit,
         }),
       });
       const json = await res.json();
@@ -157,6 +159,7 @@ export default function LedgerConsole() {
       setDate(todayISO());
       setEmailReceipt(false);
       setReceiptEmail("");
+      setCashDeposit(false);
       loadLedger();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save entry.");
@@ -384,6 +387,20 @@ export default function LedgerConsole() {
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {type === "debt" && (
+                <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={cashDeposit}
+                      onChange={(e) => setCashDeposit(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                    />
+                    Cash deposit — email a receipt to the account owner
+                  </label>
                 </div>
               )}
             </form>
