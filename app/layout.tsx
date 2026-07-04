@@ -95,6 +95,8 @@ const organizationJsonLd = {
     name: p.name,
     url: p.url,
   })),
+  // Network cross-references for SEO/entity linking (URLs only, no self).
+  sameAs: PROGRAMS.map((p) => p.url),
 };
 
 const websiteJsonLd = {

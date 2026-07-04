@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { PROGRAMS } from "@/lib/site";
 
 export default function SiteFooter() {
   return (
@@ -35,6 +36,34 @@ export default function SiteFooter() {
           </Link>
         </div>
       </div>
+
+      {/* Sister programs: dofollow cross-links across the VA Corp network for SEO.
+          Anchor text uses the descriptive "Name — Focus" form. rel="noopener"
+          protects against reverse-tabnabbing without adding nofollow, so link
+          equity still flows. See SEO-BACKLINKS.md. */}
+      <nav
+        aria-label="Sister programs"
+        className="mx-auto max-w-6xl border-t border-white/5 px-6 py-8"
+      >
+        <h2 className="mb-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Sister programs
+        </h2>
+        <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-slate-400">
+          {PROGRAMS.map((program) => (
+            <li key={program.url}>
+              <a
+                href={program.url}
+                target="_blank"
+                rel="noopener"
+                className="transition hover:text-white"
+              >
+                {program.name} — {program.focus}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
       <div className="border-t border-white/5 py-5 text-center text-xs text-slate-600">
         &copy; {new Date().getFullYear()} VA Corp. All rights reserved.
       </div>

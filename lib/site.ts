@@ -13,12 +13,16 @@ export const SITE_DESCRIPTION =
 
 export const CONTACT_EMAIL = "teamvcorp@thevacorp.com";
 
-// Programs/initiatives, surfaced as subOrganizations in structured data.
+// Sister programs in the VA Corp network. Surfaced as subOrganizations +
+// sameAs in structured data, and as dofollow cross-links in the footer for SEO.
+// This is the parent hub, so VA Corp itself is intentionally NOT listed here.
+// Keep in sync with SEO-BACKLINKS.md. Bare-domain URLs except Edynsgate (www.).
 export const PROGRAMS = [
-  { name: "Edynsgate", url: "https://edynsgate.com", focus: "Housing" },
+  { name: "Edynsgate", url: "https://www.edynsgate.com", focus: "Housing" },
   { name: "Homeschool+", url: "https://homeschool-plus.com", focus: "Education" },
-  { name: "RallyUp", url: "https://rallyup.us", focus: "Healthcare" },
+  { name: "RallyUp", url: "https://rallyup.us", focus: "Healthcare & debt relief" },
   { name: "The Good Deed", url: "https://thegooddeed.net", focus: "Youth Leadership" },
   { name: "Spirit of Santa", url: "https://spiritofsanta.com", focus: "Positive Behavior" },
+  { name: "Black Belt Parenting", url: "https://app.fyht4.com", focus: "Parenting" },
   { name: "Grantify", url: "https://www.getgrantify.com", focus: "Grants & Funding" },
 ];
