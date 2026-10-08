@@ -4,14 +4,16 @@ import { useState } from "react";
 import TransferConsole from "./TransferConsole";
 import LedgerConsole from "./LedgerConsole";
 import PayrollConsole from "./PayrollConsole";
+import RevenueConsole from "./RevenueConsole";
 
-type Tab = "transfers" | "ledger" | "payroll";
+type Tab = "transfers" | "revenue" | "ledger" | "payroll";
 
 export default function AdminTabs() {
   const [tab, setTab] = useState<Tab>("transfers");
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "transfers", label: "Transfers" },
+    { id: "revenue", label: "Revenue" },
     { id: "ledger", label: "Accounting" },
     { id: "payroll", label: "Payroll" },
   ];
@@ -35,6 +37,7 @@ export default function AdminTabs() {
       </div>
 
       {tab === "transfers" && <TransferConsole />}
+      {tab === "revenue" && <RevenueConsole />}
       {tab === "ledger" && <LedgerConsole />}
       {tab === "payroll" && <PayrollConsole />}
     </div>

@@ -15,3 +15,19 @@ export const stripe = new Stripe(secretKey ?? "", {
 
 /** Whether we're talking to Stripe in test mode (sk_test_...) vs live. */
 export const isStripeTestMode = (secretKey ?? "").startsWith("sk_test_");
+
+const reportingKey = process.env.STRIPE_REPORTING_KEY;
+
+/**
+ * Client for read-only revenue reporting (least privilege). Set
+ * STRIPE_REPORTING_KEY to a restricted key (rk_...) scoped READ-ONLY to
+ * balance transactions, charges, payment intents and payouts; reporting then
+ * never holds write access to charges. Falls back to the full secret key when
+ * the restricted key isn't configured.
+ */
+export const stripeReporting = reportingKey
+  ? new Stripe(reportingKey, {
+      apiVersion: "2026-05-27.dahlia",
+      appInfo: { name: "VA Corp Admin (reporting)" },
+    })
+  : stripe;
