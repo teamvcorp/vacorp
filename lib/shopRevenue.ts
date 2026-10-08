@@ -44,16 +44,37 @@ export type ShopSummary = {
   feeCents: number;
   /** Σ net — what actually landed in the balance, in cents. */
   netCents: number;
-  /** Σ metadata.surcharge_usd across sale rows, in cents. */
+  /** Σ metadata.surcharge_usd across sale rows, in cents (informational). */
   surchargeCents: number;
-  /** surcharge − Stripe fees. Negative while the surcharge is switched off. */
+  /**
+   * The platform's flat service fee: platformFeePercent × gross, rounded
+   * per transaction (refund rows credit it back). This is the compliant
+   * structure — a service fee on ALL payment methods, not a card surcharge.
+   */
+  platformFeeCents: number;
+  /**
+   * platform fee − Stripe fees: what the platform actually keeps after
+   * paying Stripe. Negative on small charges where Stripe's fixed fee
+   * component exceeds the percentage fee — the platform absorbs that.
+   */
   spreadCents: number;
-  /** net − platform spread: the figure a transfer should be based on. */
+  /**
+   * gross − platform fee: the figure a transfer should be based on. The
+   * shop pays the flat platform fee; Stripe's cost is the platform's
+   * problem, covered (or not) by the fee.
+   */
   owedCents: number;
   saleCount: number;
   refundCount: number;
   /** Gross cents per metadata.source (register, online, …) for sale rows. */
   bySource: Record<string, number>;
+  /**
+   * Distinct acct_... ids seen in this shop's charge metadata
+   * (`connected_account`, the intended payee). Exactly one → transfers can
+   * be routed automatically; zero or several → a human must pick, never a
+   * guess.
+   */
+  connectedAccounts: string[];
 };
 
 export type UnattributedTxn = {
@@ -93,6 +114,8 @@ export type RevenueReport = {
   currency: string | null;
   /** More than one currency in the window — totals mix units; surface it. */
   mixedCurrencies: boolean;
+  /** The flat service-fee rate the owed/spread columns were computed with. */
+  platformFeePercent: number;
 };
 
 /**
@@ -124,11 +147,13 @@ function emptySummary(shopId: string): ShopSummary {
     feeCents: 0,
     netCents: 0,
     surchargeCents: 0,
+    platformFeeCents: 0,
     spreadCents: 0,
     owedCents: 0,
     saleCount: 0,
     refundCount: 0,
     bySource: {},
+    connectedAccounts: [],
   };
 }
 
@@ -245,11 +270,36 @@ export type RevenueQuery =
  * Build the per-shop revenue report for a created-time window or for the rows
  * belonging to one payout (the reconcilable case: Σ net of a payout's rows
  * equals what actually hit the bank).
+ *
+ * The operator-confirmed money model (Oct 2026): a flat platform SERVICE FEE
+ * of `platformFeePercent` (default 5%) of gross, charged on all payment
+ * methods equally — not a card surcharge. Out of that fee the platform pays
+ * Stripe's actual cost and keeps (or absorbs) the difference:
+ *
+ *   platform fee = rate × gross          (per transaction, rounded)
+ *   spread       = platform fee − Stripe fees   (platform's actual take)
+ *   owed to shop = gross − platform fee         (≡ net − spread)
+ *
+ * Worked example: $1.00 gross, $0.08 Stripe fee → $0.92 net. Platform fee
+ * $0.05; owed to shop $0.95; spread −$0.03 (platform absorbed 3¢ because
+ * Stripe's fixed fee outweighs 5% on a tiny charge).
  */
 export async function buildRevenueReport(
   stripe: Stripe,
-  query: RevenueQuery
+  query: RevenueQuery,
+  opts?: { platformFeePercent?: number }
 ): Promise<RevenueReport> {
+  const platformFeePercent = opts?.platformFeePercent ?? 5;
+  if (
+    typeof platformFeePercent !== "number" ||
+    !Number.isFinite(platformFeePercent) ||
+    platformFeePercent < 0 ||
+    platformFeePercent > 100
+  ) {
+    throw new Error(`Invalid platform fee percent: ${String(opts?.platformFeePercent)}`);
+  }
+  const platformFeeRate = platformFeePercent / 100;
+
   const params: Stripe.BalanceTransactionListParams =
     query.mode === "range"
       ? {
@@ -288,6 +338,10 @@ export async function buildRevenueReport(
     target.grossCents += amount;
     target.feeCents += fee;
     target.netCents += net;
+    // Flat service fee, rounded per transaction so a per-sale statement
+    // would tie. Refund rows have a negative amount, so the fee on the
+    // refunded portion is automatically credited back to the shop.
+    target.platformFeeCents += Math.round(amount * platformFeeRate);
     if (attribution.kind === "sale") {
       target.saleCount += 1;
       // Surcharge is only summed from sale rows. (A refund row would re-read
@@ -296,6 +350,10 @@ export async function buildRevenueReport(
       target.surchargeCents += surchargeCentsFrom(attribution.charge?.metadata);
       const src = attribution.charge?.metadata?.source || "unknown";
       target.bySource[src] = (target.bySource[src] ?? 0) + amount;
+      const acct = attribution.charge?.metadata?.connected_account;
+      if (acct && /^acct_[A-Za-z0-9]+$/.test(acct) && !target.connectedAccounts.includes(acct)) {
+        target.connectedAccounts.push(acct);
+      }
     } else {
       target.refundCount += 1;
     }
@@ -358,14 +416,16 @@ export async function buildRevenueReport(
     }
   }
 
-  // Derived columns. The intended model: the customer pays a processing
-  // surcharge and the platform keeps the spread over Stripe's real cost.
-  // While the surcharge is switched off (surcharge_usd stamped as "0.00"),
-  // spread is negative by exactly the Stripe fees and owed equals gross —
-  // the platform absorbs processing costs. The columns are built either way.
+  // Derived columns — see the money model in this function's doc comment.
+  // owed = gross − platform fee is identical to net − spread, since
+  // net − (platformFee − fee) = (gross − fee) − platformFee + fee.
+  // The customer surcharge (surcharge_usd) stays informational: it is
+  // currently switched off platform-wide, and if it ever goes live the
+  // operator must decide whether it offsets the platform fee before it
+  // enters this math.
   const finalize = (s: ShopSummary) => {
-    s.spreadCents = s.surchargeCents - s.feeCents;
-    s.owedCents = s.netCents - s.spreadCents;
+    s.spreadCents = s.platformFeeCents - s.feeCents;
+    s.owedCents = s.grossCents - s.platformFeeCents;
   };
   shops.forEach(finalize);
   finalize(unattributed);
@@ -386,5 +446,6 @@ export async function buildRevenueReport(
     totals,
     currency,
     mixedCurrencies,
+    platformFeePercent,
   };
 }

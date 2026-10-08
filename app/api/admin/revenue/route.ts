@@ -9,6 +9,22 @@ export const dynamic = "force-dynamic";
 const MAX_RANGE_SECONDS = 400 * 24 * 60 * 60;
 
 /**
+ * Flat platform service fee, % of gross (operator-confirmed model: shop is
+ * owed gross − this fee; the platform pays Stripe out of it). Configurable
+ * via PLATFORM_FEE_PERCENT; a malformed value fails loudly — this is money
+ * config, so a silent fallback would misprice every shop.
+ */
+function platformFeePercent(): number {
+  const raw = process.env.PLATFORM_FEE_PERCENT;
+  if (raw === undefined || raw === "") return 5;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 100) {
+    throw new Error(`PLATFORM_FEE_PERCENT is "${raw}" — must be a number from 0 to 100.`);
+  }
+  return n;
+}
+
+/**
  * GET /api/admin/revenue?start=<unix>&end=<unix>
  * GET /api/admin/revenue?payout=po_...
  *
@@ -36,10 +52,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Invalid payout id." }, { status: 400 });
       }
       const payout = await stripeReporting.payouts.retrieve(payoutId);
-      const report = await buildRevenueReport(stripeReporting, {
-        mode: "payout",
-        payoutId,
-      });
+      const report = await buildRevenueReport(
+        stripeReporting,
+        { mode: "payout", payoutId },
+        { platformFeePercent: platformFeePercent() }
+      );
 
       // Reconciliation: Σ net of the payout's revenue + platform rows
       // (excluding the payout's own negative row, if Stripe includes it)
@@ -85,11 +102,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const report = await buildRevenueReport(stripeReporting, {
-      mode: "range",
-      startUnix: start,
-      endUnix: end,
-    });
+    const report = await buildRevenueReport(
+      stripeReporting,
+      { mode: "range", startUnix: start, endUnix: end },
+      { platformFeePercent: platformFeePercent() }
+    );
 
     return NextResponse.json({
       testMode: isStripeTestMode,

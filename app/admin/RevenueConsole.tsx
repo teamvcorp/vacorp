@@ -20,12 +20,22 @@ type ShopSummary = {
   feeCents: number;
   netCents: number;
   surchargeCents: number;
+  platformFeeCents: number;
   spreadCents: number;
   owedCents: number;
   saleCount: number;
   refundCount: number;
   bySource: Record<string, number>;
+  connectedAccounts: string[];
 };
+
+type Account = {
+  id: string;
+  label: string;
+  transfersActive: boolean;
+};
+
+type TransferResult = { id: string; amountCents: number };
 
 type UnattributedTxn = {
   id: string;
@@ -58,6 +68,7 @@ type Report = {
   };
   currency: string | null;
   mixedCurrencies: boolean;
+  platformFeePercent: number;
 };
 
 type ReportResponse = {
@@ -132,6 +143,15 @@ export default function RevenueConsole() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Leg-2 collection: pay each shop its computed "owed" figure. The amount is
+  // never typed — it goes from the report straight into the transfer.
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [transferShop, setTransferShop] = useState<ShopSummary | null>(null);
+  const [transferDestination, setTransferDestination] = useState("");
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferResults, setTransferResults] = useState<Record<string, TransferResult>>({});
+
   // Lazy-load the payout list the first time payout mode is opened.
   useEffect(() => {
     if (mode !== "payout" || payouts !== null) return;
@@ -149,9 +169,34 @@ export default function RevenueConsole() {
     })();
   }, [mode, payouts]);
 
+  const openTransfer = useCallback(
+    async (shop: ShopSummary) => {
+      setTransferError(null);
+      setTransferShop(shop);
+      // Preselect only when the shop's charges name exactly one payee —
+      // zero or several means a human picks, never a guess.
+      setTransferDestination(shop.connectedAccounts.length === 1 ? shop.connectedAccounts[0] : "");
+      if (accounts === null) {
+        try {
+          const res = await fetch("/api/admin/accounts");
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || "Failed to load accounts");
+          setAccounts(json.accounts);
+        } catch (err) {
+          setAccounts([]);
+          setTransferError(
+            err instanceof Error ? err.message : "Failed to load connected accounts."
+          );
+        }
+      }
+    },
+    [accounts]
+  );
+
   const run = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setTransferResults({}); // results belong to the report they were sent from
     try {
       let url: string;
       if (mode === "payout") {
@@ -191,15 +236,69 @@ export default function RevenueConsole() {
 
   const report = data?.report ?? null;
   const currency = report?.currency ?? "usd";
+
+  // Stable identifier for the reported period — used in the transfer's
+  // idempotency key and audit metadata.
+  const periodKey = data
+    ? data.mode === "payout"
+      ? data.payout?.id ?? "payout"
+      : `${data.period?.startUnix}-${data.period?.endUnix}`
+    : "";
+  const periodLabel = data
+    ? data.mode === "payout"
+      ? `payout ${data.payout?.id}`
+      : `${new Date((data.period?.startUnix ?? 0) * 1000).toLocaleDateString()} – ${new Date(
+          ((data.period?.endUnix ?? 0) - 1) * 1000
+        ).toLocaleDateString()}`
+    : "";
+
+  async function doTransferOwed() {
+    if (!transferShop || !data) return;
+    setTransferSubmitting(true);
+    setTransferError(null);
+    try {
+      const res = await fetch("/api/admin/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination: transferDestination,
+          amountCents: transferShop.owedCents,
+          currency,
+          description: `Revenue share ${transferShop.shopId} — ${periodLabel}`,
+          // Deterministic key: re-sending the same shop + period + amount
+          // within Stripe's 24h idempotency window is a no-op, so a
+          // double-click or a re-run of the same report can't pay twice.
+          idempotencyKey: `rev:${transferShop.shopId}:${periodKey}:${transferShop.owedCents}`,
+          metadata: {
+            basis: "revenue_report",
+            shop_id: transferShop.shopId,
+            period: periodKey,
+            gross_cents: String(transferShop.grossCents),
+            stripe_fee_cents: String(transferShop.feeCents),
+            platform_fee_cents: String(transferShop.platformFeeCents),
+            owed_cents: String(transferShop.owedCents),
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Transfer failed.");
+      setTransferResults((prev) => ({
+        ...prev,
+        [transferShop.shopId]: { id: json.id, amountCents: json.amount },
+      }));
+      setTransferShop(null);
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : "Transfer failed.");
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
   const hasUnattributed =
     report !== null &&
     (report.unattributed.saleCount > 0 || report.unattributed.refundCount > 0);
   const shopRows: ShopSummary[] = report
     ? [...report.shops, ...(hasUnattributed ? [report.unattributed] : [])]
     : [];
-  const totalSales = report
-    ? report.shops.reduce((n, s) => n + s.saleCount, 0) + report.unattributed.saleCount
-    : 0;
   const totalSurcharge = report
     ? report.shops.reduce((n, s) => n + s.surchargeCents, 0) +
       report.unattributed.surchargeCents
@@ -389,13 +488,12 @@ export default function RevenueConsole() {
                 or treat per-row currency carefully.
               </p>
             )}
-            {totalSales > 0 && totalSurcharge === 0 && (
-              <p className="mt-3 text-xs text-slate-500">
-                No surcharge collected in this period (surcharge flag off): platform spread
-                is negative by exactly the Stripe fees, and &ldquo;owed to shop&rdquo;
-                equals gross — the platform is absorbing processing costs.
-              </p>
-            )}
+            <p className="mt-3 text-xs text-slate-500">
+              Owed to shop = gross − platform fee ({report.platformFeePercent}% of gross).
+              Spread = platform fee − Stripe&apos;s actual fees; negative spread means
+              Stripe cost more than the fee on those charges and the platform absorbed
+              the difference.
+            </p>
           </section>
 
           {/* Per-shop table */}
@@ -412,12 +510,16 @@ export default function RevenueConsole() {
                     <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
                       <th className="px-3 py-2">Shop</th>
                       <th className={cellRight}>Gross</th>
-                      <th className={cellRight}>Fees</th>
+                      <th className={cellRight}>Stripe fees</th>
                       <th className={cellRight}>Net</th>
-                      <th className={cellRight}>Surcharge</th>
+                      <th className={cellRight}>
+                        Platform fee ({report.platformFeePercent}%)
+                      </th>
+                      {totalSurcharge > 0 && <th className={cellRight}>Surcharge</th>}
                       <th className={cellRight}>Spread</th>
                       <th className={cellRight}>Owed to shop</th>
                       <th className={cellRight}>Sales / refunds</th>
+                      <th className={cellRight}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -437,8 +539,13 @@ export default function RevenueConsole() {
                           <td className={cellRight}>{formatMoney(s.feeCents, currency)}</td>
                           <td className={cellRight}>{formatMoney(s.netCents, currency)}</td>
                           <td className={cellRight}>
-                            {formatMoney(s.surchargeCents, currency)}
+                            {formatMoney(s.platformFeeCents, currency)}
                           </td>
+                          {totalSurcharge > 0 && (
+                            <td className={cellRight}>
+                              {formatMoney(s.surchargeCents, currency)}
+                            </td>
+                          )}
                           <td
                             className={`${cellRight} ${
                               s.spreadCents < 0 ? "text-red-400" : ""
@@ -451,6 +558,28 @@ export default function RevenueConsole() {
                           </td>
                           <td className={cellRight}>
                             {s.saleCount} / {s.refundCount}
+                          </td>
+                          <td className={cellRight}>
+                            {isUnattributed ? null : transferResults[s.shopId] ? (
+                              <span className="text-xs font-medium text-emerald-400">
+                                ✓ Sent {formatMoney(transferResults[s.shopId].amountCents, currency)}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => openTransfer(s)}
+                                disabled={s.owedCents <= 0 || report.mixedCurrencies}
+                                title={
+                                  report.mixedCurrencies
+                                    ? "Mixed currencies in this window — split the period first."
+                                    : s.owedCents <= 0
+                                      ? "Nothing owed for this period."
+                                      : "Transfer the computed owed amount to this shop's connected account"
+                                }
+                                className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Transfer owed
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -521,6 +650,104 @@ export default function RevenueConsole() {
             </section>
           )}
         </>
+      )}
+
+      {/* Transfer-owed confirmation modal */}
+      {transferShop && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="mb-2 text-lg font-bold text-white">Pay {transferShop.shopId}</h3>
+            <p className="mb-4 text-sm text-slate-400">
+              Transfers the computed &ldquo;owed to shop&rdquo; figure for {periodLabel}. The
+              platform fee stays behind — that withholding is how the fee is collected.
+            </p>
+            <dl className="mb-4 space-y-2 rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Gross · Stripe fees</dt>
+                <dd className="text-white">
+                  {formatMoney(transferShop.grossCents, currency)} ·{" "}
+                  {formatMoney(transferShop.feeCents, currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">
+                  Platform fee ({report?.platformFeePercent}%)
+                </dt>
+                <dd className="text-white">
+                  {formatMoney(transferShop.platformFeeCents, currency)}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Owed to shop</dt>
+                <dd className="font-semibold text-emerald-400">
+                  {formatMoney(transferShop.owedCents, currency)}
+                </dd>
+              </div>
+            </dl>
+
+            <label className="mb-1 block text-sm font-medium text-slate-300">
+              Destination connected account
+            </label>
+            <select
+              value={transferDestination}
+              onChange={(e) => setTransferDestination(e.target.value)}
+              className="mb-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-blue-500"
+            >
+              <option value="">
+                {accounts === null ? "Loading accounts…" : "Select an account…"}
+              </option>
+              {(accounts ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label} — {a.id}
+                  {a.transfersActive ? "" : " (transfers not active)"}
+                </option>
+              ))}
+            </select>
+            {transferShop.connectedAccounts.length === 1 && (
+              <p className="mb-2 text-xs text-slate-500">
+                Pre-selected from this shop&apos;s charge metadata (connected_account).
+              </p>
+            )}
+            {transferShop.connectedAccounts.length > 1 && (
+              <p className="mb-2 text-xs text-amber-400">
+                ⚠ This shop&apos;s charges name {transferShop.connectedAccounts.length}{" "}
+                different connected accounts ({transferShop.connectedAccounts.join(", ")}).
+                Pick the right one deliberately.
+              </p>
+            )}
+            {transferShop.connectedAccounts.length === 0 && (
+              <p className="mb-2 text-xs text-slate-500">
+                This shop&apos;s charges don&apos;t carry connected_account metadata — pick
+                the payee manually.
+              </p>
+            )}
+
+            {transferError && (
+              <div className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {transferError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTransferShop(null)}
+                disabled={transferSubmitting}
+                className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doTransferOwed}
+                disabled={transferSubmitting || !transferDestination.startsWith("acct_")}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {transferSubmitting
+                  ? "Sending…"
+                  : `Send ${formatMoney(transferShop.owedCents, currency)}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

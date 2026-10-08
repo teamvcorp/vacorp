@@ -124,6 +124,23 @@ difference between that and Stripe's real cost.
    different structure and is generally permitted. Same money, different legal basis.
    Confirm which one is intended before building reports around 5%.
 
+### ✅ Operator decision (recorded 2026-10-08)
+
+The platform operator confirmed the **flat platform service fee** model, charged on all
+payment methods equally (the compliant structure from point 2 above). The implemented
+columns are therefore:
+
+| Column | How |
+|---|---|
+| Platform fee | `PLATFORM_FEE_PERCENT` (default **5%**) × gross, rounded per transaction; refund rows credit it back |
+| Platform spread | platform fee − Stripe fees (negative on small charges — the platform absorbs it) |
+| **Owed to shop** | gross − platform fee (≡ net − spread) |
+
+Worked example: $1.00 gross, $0.08 Stripe fee → net $0.92. Platform fee $0.05 →
+**owed to shop $0.95**, spread −$0.03. The customer surcharge (`surcharge_usd`) remains
+informational-only; if it is ever switched on, decide whether it offsets the platform
+fee before changing this math.
+
 ---
 
 ## Reconciliation
