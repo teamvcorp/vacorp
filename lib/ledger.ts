@@ -12,6 +12,9 @@ type LedgerDoc = {
   description: string;
   date: string; // YYYY-MM-DD — the day it occurred
   createdAt: Date;
+  // Set on entries auto-logged from a Stripe transfer (tr_...). Unique when
+  // present, so a retried/idempotent transfer can never double-log the debt.
+  transferId?: string;
 };
 
 export type LedgerEntry = {
@@ -22,6 +25,7 @@ export type LedgerEntry = {
   description: string;
   date: string;
   createdAt: string;
+  transferId?: string;
 };
 
 async function collection() {
@@ -41,6 +45,7 @@ function serialize(doc: LedgerDoc): LedgerEntry {
       doc.createdAt instanceof Date
         ? doc.createdAt.toISOString()
         : String(doc.createdAt),
+    ...(doc.transferId ? { transferId: doc.transferId } : {}),
   };
 }
 
@@ -112,6 +117,69 @@ export async function addEntry(input: {
   const doc: LedgerDoc = { ...input, createdAt: new Date() };
   const res = await col.insertOne(doc);
   return serialize({ ...doc, _id: res.insertedId });
+}
+
+// Unique sparse index on transferId — created once per process, idempotent on
+// Mongo's side. Sparse so the manual entries (no transferId) are unaffected.
+let transferIndexReady: Promise<unknown> | null = null;
+async function ensureTransferIndex(col: Awaited<ReturnType<typeof collection>>) {
+  transferIndexReady ??= col
+    .createIndex({ transferId: 1 }, { unique: true, sparse: true })
+    .catch(() => {
+      transferIndexReady = null; // retry on next call rather than caching a failure
+    });
+  await transferIndexReady;
+}
+
+/** YYYY-MM-DD for "now" in server-local time (ledger dates are calendar days). */
+export function todayLocalISO(now = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Auto-log a Stripe transfer to a connected account as a ledger DEBT entry
+ * (money disbursed to the account counts against its balance: payments − debts).
+ *
+ * Idempotent on transferId: Stripe's idempotency can hand the same transfer
+ * back for a retried request, and the money only moved once — so the debt must
+ * only be logged once. The unique index makes this hold even for concurrent
+ * retries; on a duplicate insert the existing entry is returned instead.
+ */
+export async function recordTransferDebt(input: {
+  accountId: string;
+  amountCents: number;
+  description: string;
+  transferId: string;
+}): Promise<{ entry: LedgerEntry; created: boolean }> {
+  const col = await collection();
+  await ensureTransferIndex(col);
+
+  const existing = await col.findOne({ transferId: input.transferId });
+  if (existing) return { entry: serialize(existing), created: false };
+
+  const doc: LedgerDoc = {
+    accountId: input.accountId,
+    type: "debt",
+    amountCents: input.amountCents,
+    description: input.description.slice(0, 500),
+    date: todayLocalISO(),
+    createdAt: new Date(),
+    transferId: input.transferId,
+  };
+  try {
+    const res = await col.insertOne(doc);
+    return { entry: serialize({ ...doc, _id: res.insertedId }), created: true };
+  } catch (err) {
+    // Duplicate key → a concurrent request logged it first; return that one.
+    if (err && typeof err === "object" && (err as { code?: number }).code === 11000) {
+      const winner = await col.findOne({ transferId: input.transferId });
+      if (winner) return { entry: serialize(winner), created: false };
+    }
+    throw err;
+  }
 }
 
 export async function deleteEntry(

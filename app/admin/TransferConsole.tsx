@@ -26,6 +26,8 @@ type TransferResult = {
   amount: number;
   currency: string;
   destination: string;
+  /** Result of the automatic ledger debt entry logged for this transfer. */
+  ledger?: { logged: boolean; entryId?: string; error?: string };
 };
 
 function formatMoney(minor: number, currency: string) {
@@ -270,6 +272,23 @@ export default function TransferConsole() {
             ✓ Transferred {formatMoney(result.amount, result.currency)} to{" "}
             {result.destination}.<br />
             <span className="text-xs text-emerald-400/80">{result.id}</span>
+            {result.ledger?.logged ? (
+              <>
+                <br />
+                <span className="text-xs text-emerald-400/80">
+                  Logged in Accounting as a debt entry.
+                </span>
+              </>
+            ) : result.ledger ? (
+              <>
+                <br />
+                <span className="text-xs text-amber-300">
+                  ⚠ Transfer sent, but the ledger entry failed
+                  {result.ledger.error ? ` (${result.ledger.error})` : ""} — add
+                  the debt manually in Accounting.
+                </span>
+              </>
+            ) : null}
           </div>
         )}
       </section>

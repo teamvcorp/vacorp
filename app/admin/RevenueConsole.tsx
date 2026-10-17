@@ -35,7 +35,7 @@ type Account = {
   transfersActive: boolean;
 };
 
-type TransferResult = { id: string; amountCents: number };
+type TransferResult = { id: string; amountCents: number; ledgerLogged: boolean };
 
 type UnattributedTxn = {
   id: string;
@@ -284,7 +284,11 @@ export default function RevenueConsole() {
       if (!res.ok) throw new Error(json.error || "Transfer failed.");
       setTransferResults((prev) => ({
         ...prev,
-        [transferShop.shopId]: { id: json.id, amountCents: json.amount },
+        [transferShop.shopId]: {
+          id: json.id,
+          amountCents: json.amount,
+          ledgerLogged: json.ledger?.logged === true,
+        },
       }));
       setTransferShop(null);
     } catch (err) {
@@ -561,8 +565,18 @@ export default function RevenueConsole() {
                           </td>
                           <td className={cellRight}>
                             {isUnattributed ? null : transferResults[s.shopId] ? (
-                              <span className="text-xs font-medium text-emerald-400">
+                              <span
+                                className="text-xs font-medium text-emerald-400"
+                                title={
+                                  transferResults[s.shopId].ledgerLogged
+                                    ? "Logged in Accounting as a debt entry"
+                                    : "Transfer sent, but the ledger entry failed — add the debt manually in Accounting"
+                                }
+                              >
                                 ✓ Sent {formatMoney(transferResults[s.shopId].amountCents, currency)}
+                                {transferResults[s.shopId].ledgerLogged ? null : (
+                                  <span className="ml-1 text-amber-400">⚠ ledger</span>
+                                )}
                               </span>
                             ) : (
                               <button

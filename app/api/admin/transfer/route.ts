@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { stripe } from "@/lib/stripe";
+import { recordTransferDebt } from "@/lib/ledger";
 
 type TransferBody = {
   destination?: unknown;
@@ -118,12 +119,43 @@ export async function POST(request: Request) {
       idempotencyKey ? { idempotencyKey } : undefined
     );
 
+    // Auto-log the disbursement in the account's ledger as a DEBT entry so the
+    // Accounting tab reflects every transfer without manual entry. Keyed on the
+    // transfer id, so an idempotent Stripe retry can't double-log. Best-effort:
+    // the money has already moved, so a ledger failure is reported in the
+    // response but never fails the transfer.
+    let ledger: { logged: boolean; entryId?: string; error?: string };
+    try {
+      const destId =
+        typeof transfer.destination === "string"
+          ? transfer.destination
+          : transfer.destination?.id ?? destination;
+      const { entry } = await recordTransferDebt({
+        accountId: destId,
+        amountCents: transfer.amount,
+        description: description
+          ? `Transfer ${transfer.id} — ${description}`
+          : `Transfer ${transfer.id}`,
+        transferId: transfer.id,
+      });
+      ledger = { logged: true, entryId: entry.id };
+    } catch (err) {
+      ledger = {
+        logged: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Transfer sent, but the ledger entry could not be saved.",
+      };
+    }
+
     return NextResponse.json({
       id: transfer.id,
       amount: transfer.amount,
       currency: transfer.currency,
       destination: transfer.destination,
       created: transfer.created,
+      ledger,
     });
   } catch (err) {
     const message =
