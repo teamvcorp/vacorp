@@ -11,8 +11,12 @@ type Flags = {
   balance: {
     available: number;
     instantAvailable: number;
+    /** Instant balance net of the platform's configured instant-payout fee. */
+    instantNetAvailable: number;
     pending: number;
   };
+  /** False → no fee set in the Platform Pricing Tool; platform absorbs Stripe's 1%. */
+  instantFeeConfigured: boolean;
   destination: { type: "card" | "bank"; label: string } | null;
 };
 
@@ -146,7 +150,10 @@ export default function InstantPayoutPanel({
   }
 
   const amountNum = Number(amount);
-  const amountValid = Number.isFinite(amountNum) && amountNum > 0;
+  const amountValid =
+    Number.isFinite(amountNum) &&
+    amountNum > 0 &&
+    (!flags || Math.round(amountNum * 100) <= flags.balance.instantNetAvailable);
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
@@ -200,10 +207,17 @@ export default function InstantPayoutPanel({
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-1">
             <span className="text-emerald-300">
-              Instant-available{" "}
+              Instantly payable{" "}
               <span className="font-semibold">
-                {formatMoney(flags.balance.instantAvailable, "usd")}
+                {formatMoney(flags.balance.instantNetAvailable, "usd")}
               </span>
+              {flags.balance.instantNetAvailable !==
+                flags.balance.instantAvailable && (
+                <span className="ml-1 text-xs text-emerald-400/70">
+                  (of {formatMoney(flags.balance.instantAvailable, "usd")} — rest
+                  is the instant-payout fee)
+                </span>
+              )}
             </span>
             <span className="text-slate-300">
               Available{" "}
@@ -215,6 +229,14 @@ export default function InstantPayoutPanel({
               Pending {formatMoney(flags.balance.pending, "usd")}
             </span>
           </div>
+          {!flags.instantFeeConfigured && (
+            <p className="mt-2 text-xs text-amber-400">
+              ⚠ No instant-payout fee is configured in Stripe&apos;s Platform
+              Pricing Tool (Dashboard → Settings → Connect → Platform pricing),
+              so the platform absorbs Stripe&apos;s 1% instant-payout cost on
+              every instant payout. Configure a fee ≥ 1% to pass it to the shop.
+            </p>
+          )}
           {flags.balance.instantAvailable === 0 &&
             flags.balance.available > 0 && (
               <p className="mt-2 text-xs text-slate-500">
@@ -283,8 +305,8 @@ export default function InstantPayoutPanel({
               <p className="text-slate-200">{label || "Connected account"}</p>
               <p className="font-mono text-xs text-slate-500">{accountId}</p>
               <p className="mt-1 text-xs text-emerald-300">
-                Instant-available{" "}
-                {formatMoney(flags.balance.instantAvailable, "usd")}
+                Instantly payable{" "}
+                {formatMoney(flags.balance.instantNetAvailable, "usd")}
               </p>
             </div>
             <div className="sm:border-l sm:border-slate-800 sm:pl-4">
@@ -308,8 +330,8 @@ export default function InstantPayoutPanel({
               <label className="mb-1 block text-xs text-slate-400">
                 Amount{" "}
                 <span className="text-slate-500">
-                  (instant-available{" "}
-                  {formatMoney(flags.balance.instantAvailable, "usd")})
+                  (instantly payable{" "}
+                  {formatMoney(flags.balance.instantNetAvailable, "usd")})
                 </span>
               </label>
               <input
